@@ -1,0 +1,180 @@
+{{define "common_resources"}}
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link type="text/css" rel="stylesheet" href="/static/style.css">
+<script type="text/javascript" src="/static/jquery-3.4.1.min.js"></script>
+
+<script>
+function getUrlParameter(sParam, defaultValue) {
+    var sPageURL = window.location.search.substring(1),
+        sURLVariables = sPageURL.split('&'),
+        sParameterName,
+        i;
+
+    for (i = 0; i < sURLVariables.length; i++) {
+        sParameterName = sURLVariables[i].split('=');
+
+        if (sParameterName[0] === sParam) {
+            return decodeURIComponent(sParameterName[1]);
+        }
+    }
+    return defaultValue;
+};
+
+function safeInt(sParam, defval) {
+    v = parseInt(sParam, 10)
+    if (isNaN(v)) {
+        return defval
+    }
+    return v
+}
+
+function safeFloat(sParam, defval) {
+    return parseFloat(sParam) ? parseFloat(sParam) : defval
+}
+
+
+//возращает строку даты по стандарту ISO
+function date2ISO(dt) {
+    return dt.toISOString().substr(0, 10)
+}
+
+function markChange(obj) {
+    try {
+    	obj.style.color = "red";
+	if (obj.type == "checkbox") {
+            obj.nextSibling.style.color = "red";
+    	}
+    } catch(e) {
+    	this.style.color = "red";
+	if (this.type == "checkbox") {
+            this.nextSibling.style.color = "red";
+    	}
+    }
+}
+
+function unmarkChange(obj) {
+    obj.css("color", "black");
+    if (obj.attr("type") == "checkbox") {
+        obj.next().css("color", "black");
+    }
+}
+
+function setCookie(name,value,days) {
+    var expires = "";
+    if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days*24*60*60*1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (encodeURI(value) || "")  + expires + "; path=/";
+}
+function getCookie(name) {
+    var nameEQ = name + "=";
+    var ca = document.cookie.split(';');
+    for(var i=0;i < ca.length;i++) {
+        var c = ca[i];
+        while (c.charAt(0)==' ') c = c.substring(1,c.length);
+        if (c.indexOf(nameEQ) == 0) return decodeURI(c.substring(nameEQ.length,c.length));
+    }
+    return null;
+}
+function eraseCookie(name) {   
+    document.cookie = name+'=; Max-Age=-99999999;';  
+}
+
+function loadPrefs() {
+    v = getCookie("inspector");
+    if (v != null) {
+        $("#inspector").val(v);
+    }
+    v = getCookie("signer");
+    if (v != null) {
+        $("#signer").val(v);
+    }
+}
+
+function savePrefs() {
+    setCookie("inspector", $("#inspector").val(), 365*10);
+    setCookie("signer", $("#signer").val(), 365*10);
+}
+
+function loadStaff_ajax() {
+    return $.ajax({
+        url: "/api/staff",
+	method: "GET",
+        data: {},
+        timeout: 5000
+    });
+}
+
+function loadStaff_common(data) {
+    if(data.error != null) {
+        console.log(data.error);
+    	$('#error_log').text(data.error);
+	    return;
+    }
+    $('#inspector').empty();
+    $("#inspector").append($("<option>", {value: 0, text: "-"}));
+    $('#signer').empty();
+    $("#signer").append($("<option>", {value: 0, text: "-"}));
+    data.data.forEach( function(item){
+        var opt = $("<option>", {value: item.id, text: item.fio})
+    	if (item.signer == 1) {
+	    $("#signer").append(opt);
+	} else {
+	    $("#inspector").append(opt);
+	}
+    });
+    loadPrefs();
+}
+
+function loadStaff() {
+    $.ajax({
+        url: "/api/staff",
+	method: "GET",
+        data: {},
+        timeout: 5000
+    })
+    .done(function(data, textStatus, jqXHR) {
+        if(data.error != null) {
+            console.log(data.error);
+            $('#error_log').text(data.error);
+            return;
+        }
+	$('#inspector').empty();
+	$("#inspector").append($("<option>", {value: 0, text: "-"}));
+	$('#signer').empty();
+	$("#signer").append($("<option>", {value: 0, text: "-"}));
+        data.data.forEach( function(item){
+            var opt = $("<option>", {value: item.id, text: item.fio})
+	    if (item.signer == 1) {
+	       $("#signer").append(opt);
+	    } else {
+	       $("#inspector").append(opt);
+	    }
+        });
+	loadPrefs();
+    })
+    .fail(function(data, textStatus, jqXHR) {
+        console.log(data);
+        $('#error_log').text("ajax /api/staff_list fail");
+    });
+}
+
+</script>
+
+{{end}}
+
+{{define "common_header"}}
+<h2><img src="/static/ic_av_timer_black_48dp.png"/>Проверки</h2>
+<div width="100%">
+<table width="100%" class="datatable">
+<tr><td><a href="/">Проверки</a></td></tr>
+</table>
+<div id="error_log"></div>
+<table width="100%">
+<tr><td colspan="3" align="right">Исполнитель: <select size="1" onChange="savePrefs();" value="" id="inspector"/></td></tr>
+<tr><td colspan="3" align="right">Подписант: <select size="1" onChange="savePrefs();" value="" id="signer"/></td></tr>
+</table>
+</div>
+{{end}}

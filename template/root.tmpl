@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+{{template "common_resources"}}
+<title>Проверки</title>
+<script>
+  function addCheck() {
+      window.location.assign("/check")
+  }
+
+  function defaultFilter() {
+      return  {date1: "", date2: "", inspector: -1, regnum: ""}
+  }
+
+  function getFilter() {
+      //load filter from cookies
+      var f = getCookie("filter");
+      if (f == null) {
+	  return  defaultFilter();
+      }
+      try {
+	  return JSON.parse(f)
+      } catch(e) {
+	  return  defaultFilter();
+      }
+  }
+
+  function restoreFilter(filterObj) {
+      //restore UI filter
+      ["regnum", "date1", "date2", "inspector"].forEach(function(e){
+	  $("#filter_"+e).val( filterObj[e] );
+      });
+  }
+
+  function setFilter() {
+      //save from UI to cookie
+      var filterObj = {};
+      ["regnum", "date1", "date2", "inspector"].forEach(function(e){
+	  filterObj[e] = $("#filter_"+e).val();
+      });
+      filterObj["inspector"] = safeInt(filterObj["inspector"], -1);
+      setCookie("filter", JSON.stringify(filterObj), 10/24);
+      return filterObj;
+  }
+
+  function applyFilter() {
+      var f = setFilter();
+      filterChecks(f);
+  }
+
+  function filterChecks(filterObj) {
+    $.ajax({
+        url: "/api/checks",
+	method: "GET",
+        data: filterObj,
+        timeout: 5000
+    })
+    .done(function(data, textStatus, jqXHR) {
+        if(data.error != null) {
+            console.log(data.error);
+            $('#error_log').text(data.error);
+            return;
+        }
+	$('#search_result').empty();
+        data.data.forEach( function(item, i, arr){
+            var tr = $("<tr/>")
+            tr.append($("<td>", {class:"datacell", text: item.id}));
+            tr.append($("<td>", {class:"datacell", append: $("<a>", {href:"/check?id="+item.id, text:item.insurer_regnum }) }));
+            tr.append($("<td>", {class:"datacell", text: item.insurer_shortname}));
+            tr.append($("<td>", {class:"datacell", style:"white-space: nowrap", text: item.check_date_start}));
+            tr.append($("<td>", {class:"datacell", style:"white-space: nowrap", text: item.check_date_end}));
+            tr.append($("<td>", {class:"datacell", text: item.docs_req_number>0 ? item.docs_req_number : ""}));
+            tr.append($("<td>", {class:"datacell", style:"white-space: nowrap", text: item.docs_req_number>0 ? item.docs_req_date: ""}));
+            tr.append($("<td>", {class:"datacell", text: item.docs_memorandum_number>0 ? item.docs_memorandum_number : ""}));
+            tr.append($("<td>", {class:"datacell", style:"white-space: nowrap", text: item.docs_memorandum_number>0 ? item.docs_memorandum_date: ""}));
+            tr.append($("<td>", {class:"datacell", text: item.docs_act_number>0 ? item.docs_act_number : ""}));
+            tr.append($("<td>", {class:"datacell", style:"white-space: nowrap", text: item.docs_act_number>0 ? item.docs_act_date: ""}));
+            tr.append($("<td>", {class:"datacell", text: item.docs_decision_number>0 ? item.docs_decision_number : ""}));
+            tr.append($("<td>", {class:"datacell", style:"white-space: nowrap", text: item.docs_decision_number>0 ? item.docs_decision_date: ""}));
+            tr.append($("<td>", {class:"datacell", text: item.docs_charge_number>0 ? item.docs_charge_number : ""}));
+            tr.append($("<td>", {class:"datacell", style:"white-space: nowrap", text: item.docs_charge_number>0 ? item.docs_charge_date: ""}));
+            tr.append($("<td>", {class:"datacell", style:"white-space: nowrap", text: item.inspector_fio}));
+	    $('#search_result').append(tr);
+        });
+    })
+    .fail(function(data, textStatus, jqXHR) {
+        console.log(data);
+        $('#error_log').text("ajax /api/check_list fail");
+    });
+  }
+
+  function loadStaff_filter(data){
+      $('#filter_inspector').empty();
+      $("#filter_inspector").append($("<option>", {value: -1, text: "Все"}));
+      $("#filter_inspector").append($("<option>", {value: 0, text: "-"}));
+      data.data.forEach( function(item){
+          var opt = $("<option>", {value: item.id, text: item.fio})
+    	  if (item.signer == 0) {
+	      $("#filter_inspector").append(opt);
+	  }
+      });
+  }
+  
+  document.addEventListener("DOMContentLoaded", function(){
+      $.when(loadStaff_ajax()).done(function(data, status, jhr){
+	  loadStaff_common(data);
+	  loadStaff_filter(data);
+	  restoreFilter(getFilter());
+	  filterChecks(getFilter());
+      });
+  });
+</script>
+</head>
+<body>
+{{template "common_header"}}
+<div class="wrap">
+  <div class="container">
+    Фильтр<br>
+    <table class="datatable"><tr><td>
+	  Рег.номер <input type="text" id="filter_regnum" size="20">
+Проверяющий <select id="filter_inspector"></select> Дата с <input type="date" id="filter_date1"> по <input type="date" id="filter_date2">
+    <button onclick="applyFilter(); return false;">Выбрать</button>
+    </td></tr></table>
+<div id="test"></div>
+</div>
+<div class="container">
+<div class="wrap"><button onclick="addCheck(); return false;">Добавить проверку</button></div>
+<br/>
+<table class="datatable"> 
+<thead>
+<tr>
+<td class="datacell">ID</td>
+<td class="datacell">Рег. номер</td>
+<td class="datacell">Наименование</td>
+<td class="datacell">Дата1</td>
+<td class="datacell">Дата2</td>
+<td class="datacell">№ треб</td>
+<td class="datacell">Дата треб</td>
+<td class="datacell">№ докл</td>
+<td class="datacell">Дата докл</td>
+<td class="datacell">№ акта</td>
+<td class="datacell">Дата акта</td>
+<td class="datacell">№ реш</td>
+<td class="datacell">Дата реш</td>
+<td class="datacell">№ треб(упл)</td>
+<td class="datacell">Дата треб(упл)</td>
+<td class="datacell">Проверяющий</td>
+</tr></thead>
+<tbody id="search_result"></tbody>
+</table>
+</div>
+</div>
+
+</body>
+</html>

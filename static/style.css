@@ -1,0 +1,55 @@
+html,
+body {
+    height: 100%;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.42857143;
+    color: #333;
+    background-color: #fff;    
+}
+
+h1, h2, h3 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+a {
+    color: #337ab7;
+    text-decoration: none;
+}
+
+img {
+    vertical-align: middle;
+    border: 0;
+}
+
+input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"] {
+    line-height: 34px;
+}
+
+.datatable tr:nth-child(even) {
+	background-color: #eeeeee;
+}
+.datatable tr:nth-child(odd) {
+	background-color: #dddddd;
+}
+
+.datatable {
+	border: 3px solid gray;
+	border-collapse:collapse;
+}
+
+.datacell {
+	border: 1px solid black;
+}
+
+.wrap {
+    min-height: 100%;
+    height: auto;
+    margin: 0 auto -60px;
+    padding: 0 0 60px;
+}
+
+.wrap > .container {
+    padding: 10px 10px 10px;
+}

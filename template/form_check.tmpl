@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html>
+<head>
+{{template "common_resources"}}
+<title>Проверки</title>
+<script>
+
+  //utility
+  function fillForm(data) {
+      for(var k in data) {
+          if ($('#'+k).length==0) {continue;}
+          if ($('#'+k).is("span")) {
+	      $('#'+k).text(data[k]);
+          }
+          if ($('#'+k).is("input") &&
+	      (($('#'+k).attr('type') == "hidden") ||
+	       ($('#'+k).attr('type') == "date") ||
+	       ($('#'+k).attr('type') == "text"))) {
+	      $('#'+k).val(data[k]);
+          }
+          if ($('#'+k).is("select")) {
+	      $('#'+k).val(data[k]);
+          }
+          if ($('#'+k).is("input") && ($('#'+k).attr('type') == "checkbox")) {
+	      if (data[k] == 1) {
+                  $('#'+k).prop('checked', true);
+	      } else {
+                  $('#'+k).prop('checked', false);
+	      }
+          }
+          unmarkChange($('#'+k));
+      }
+  }
+
+  function gatherForm(keylist) {
+      var res = {};
+      keylist.forEach(function(k) {
+	  if ($('#'+k).length==0) {return;}
+	  if ($('#'+k).is("span")) {
+	      res[k] = $('#'+k).text();
+	  }
+	  if ($('#'+k).is("input") && (($('#'+k).attr('type') == "date") ||
+				       ($('#'+k).attr('type') == "text") ||
+				       ($('#'+k).attr('type') == "hidden"))) {
+	      res[k] = $('#'+k).val();
+	  }
+	  if ($('#'+k).is("select")) {
+	      res[k] = $('#'+k).val();
+	  }
+	  if ($('#'+k).is("input") && ($('#'+k).attr('type') == "checkbox")) {
+	      if ($('#'+k).is(':checked')) {
+		  res[k] = 1;
+	      } else {
+		  res[k] = 0;
+	      }
+	  }
+      });
+      //specials
+      res["id"] = safeInt(res["id"], 0)
+      if ("inspector_id" in res) {
+	  res["inspector_id"] = safeInt(res["inspector_id"], 0);
+	  res["inspector_fio"] = $("#inspector_id option:selected").text();
+      }
+      return res;
+  }
+
+  function setInspectorFromCookie() {
+      $("#inspector_id").val(safeInt(getCookie("inspector"), 0));
+  }
+
+  //1. находим страхователя
+  function fillInsurer(){
+      var regnum = $("#regnum").val();
+      if (regnum=="") { return; }
+      return $.ajax({
+          url: "/api/insurers/"+regnum,
+	  method: "GET",
+          timeout: 5000
+      }).done(function(data, textStatus, jqXHR) {
+          if(data.error != null) {
+              console.log(data.error);
+              $('#error_log').text(data.error);
+              return;
+          }
+          fillForm(data.data)
+      }).fail(function(data, textStatus, jqXHR) {
+          console.log(data);
+          $('#error_log').text("ajax /api/insurers fail");
+      });
+  }
+
+  //2. сохраняем заголовок, перезагружаем форму
+  function saveHeader() {
+      data = gatherForm(
+	  ['id',
+	   'insurer_regnum',
+	   'insurer_kpsnum',
+	   'insurer_inn',
+	   'insurer_kpp',
+	   'insurer_fullname',
+	   'insurer_shortname',
+	   'insurer_postindex',
+	   'insurer_postaddress',
+	   'check_date_start',
+	   'check_date_end',
+	   'check_period_start',
+	   'check_period_end',
+	   'inspector_id'
+	  ]);
+      if (data['insurer_regnum'] == "") {
+	  return;
+      }
+      idd = data['id'];
+      $.ajax({
+          url: "/api/checks/"+idd.toString()+"/header",
+          method: "POST",
+          data: JSON.stringify(data),
+          timeout: 5000
+      }).done(function(data, textStatus, jqXHR) {
+          if(data.error != null) {
+	      console.log(data.error);
+	      $('#error_log').text(data.error);
+	      return;
+          }
+	  if (idd==0){
+	      idd = data.data.id;
+	      window.location.assign("/check?id="+idd);
+	  } else {
+	      fillForm(data.data);
+	  }
+      }).fail(function(data, textStatus, jqXHR) {
+          console.log(data);
+          $('#error_log').text("ajax /api/checks/*/header fail");
+      });
+  }
+
+  //3. сохраняем требование
+  function saveDocsReq() {
+      data = gatherForm(
+	  ['id',
+	   'docs_req_date',
+	   'docs_req_flag_sicklist',
+	   'docs_req_flag_birth',
+	   'docs_req_flag_1_early',
+	   'docs_req_flag_1_birth',
+	   'docs_req_flag_15_child',
+	   'docs_req_flag_accident',
+	   'docs_req_flag_vacation',
+	   'docs_req_flag_4days',
+	   'docs_req_flag_burial_soc',
+	   'docs_req_flag_burial_spec'
+	  ]);
+      return $.ajax({
+          url: "/api/checks/"+data["id"].toString()+"/req",
+          method: "POST",
+          data: JSON.stringify(data),
+          timeout: 5000
+      }).done(function(data, textStatus, jqXHR) {
+          if(data.error != null) {
+	      console.log(data.error);
+	      $('#error_log').text(data.error);
+	      return;
+          }
+	  fillForm(data.data);
+      }).fail(function(data, textStatus, jqXHR) {
+          console.log(data);
+          $('#error_log').text("fail");
+      });
+  }
+  
+  //4. сохраняем докл записку
+  function saveDocsMemorandum() {
+      data = gatherForm(
+	  ['id',
+	   'docs_memorandum_date'
+	  ]);
+      return $.ajax({
+          url: "/api/checks/"+data["id"].toString()+"/memorandum",
+          method: "POST",
+          data: JSON.stringify(data),
+          timeout: 5000
+      }).done(function(data, textStatus, jqXHR) {
+          if(data.error != null) {
+	      console.log(data.error);
+	      $('#error_log').text(data.error);
+	      return;
+          }
+	  fillForm(data.data);
+      }).fail(function(data, textStatus, jqXHR) {
+          console.log(data);
+          $('#error_log').text("fail");
+      });
+  }
+
+  //5. сохраняем акт
+  function saveDocsAct() {
+      data = gatherForm(
+	  ['id',
+	   'docs_act_date'
+	  ]);
+      return $.ajax({
+          url: "/api/checks/"+data["id"].toString()+"/act",
+          method: "POST",
+          data: JSON.stringify(data),
+          timeout: 5000
+      }).done(function(data, textStatus, jqXHR) {
+          if(data.error != null) {
+	      console.log(data.error);
+	      $('#error_log').text(data.error);
+	      return;
+          }
+	  fillForm(data.data);
+      }).fail(function(data, textStatus, jqXHR) {
+          console.log(data);
+          $('#error_log').text("fail");
+      });
+  }
+
+  //6. сохраняем решение
+  function saveDocsDecision() {
+      data = gatherForm(
+	  ['id',
+	   'docs_decision_date'
+	  ]);
+      return $.ajax({
+          url: "/api/checks/"+data["id"].toString()+"/decision",
+          method: "POST",
+          data: JSON.stringify(data),
+          timeout: 5000
+      }).done(function(data, textStatus, jqXHR) {
+          if(data.error != null) {
+	      console.log(data.error);
+	      $('#error_log').text(data.error);
+	      return;
+          }
+	  fillForm(data.data);
+      }).fail(function(data, textStatus, jqXHR) {
+          console.log(data);
+          $('#error_log').text("fail");
+      });
+  }
+
+  //7. сохраняем требование
+  function saveDocsCharge() {
+      data = gatherForm(
+	  ['id',
+	   'docs_charge_date'
+	  ]);
+      return $.ajax({
+          url: "/api/checks/"+data["id"].toString()+"/charge",
+          method: "POST",
+          data: JSON.stringify(data),
+          timeout: 5000
+      }).done(function(data, textStatus, jqXHR) {
+          if(data.error != null) {
+	      console.log(data.error);
+	      $('#error_log').text(data.error);
+	      return;
+          }
+	  fillForm(data.data);
+      }).fail(function(data, textStatus, jqXHR) {
+          console.log(data);
+          $('#error_log').text("fail");
+      });
+  }
+
+  //возращает текущую дату по стандарту ISO
+  function currentDate() {
+      return (new Date()).toISOString().substr(0, 10)
+  }
+
+  function loadStaff_special(data) {
+      $('#inspector_id').empty();
+      $("#inspector_id").append($("<option>", {value: 0, text: "-"}));
+      data.data.forEach( function(item){
+          var opt = $("<option>", {value: item.id, text: item.fio})
+	  if (item.signer == 0) {
+	      $("#inspector_id").append(opt);
+	  }
+      });
+  }
+
+  function loadCheck_ajax() {
+      var idd = safeInt(getUrlParameter("id", 0), 0);
+      if (idd == 0) {
+	  return null;
+      }
+      return $.ajax({
+          url: "/api/checks/"+idd.toString(),
+	  method: "GET",
+          timeout: 5000
+      });
+  }
+
+
+  function loadCheck_data(data) {
+        fillForm(data.data);
+        $("#print_docs_req").attr("href", "/print/req/"+data.data.id);
+        $("#print_docs_memorandum").attr("href", "/print/memorandum/"+data.data.id);
+        $("#print_docs_act").attr("href", "/print/act/"+data.data.id);
+        $("#print_docs_decision").attr("href", "/print/decision/"+data.data.id);
+        $("#print_docs_charge").attr("href", "/print/charge/"+data.data.id);
+  }
+
+  function genMonthSelect(name) {
+      var sel = $("<select/>", {size: 1, name: name, on:{ input: markChange }})
+      sel.append( $("<option/>", {value:"0", text: "-"}) );
+      sel.append( $("<option/>", {value:"1", text: "Январь"}) );
+      sel.append( $("<option/>", {value:"2", text: "Февраль"}) );
+      sel.append( $("<option/>", {value:"3", text: "Март"}) );
+      sel.append( $("<option/>", {value:"4", text: "Апрель"}) );
+      sel.append( $("<option/>", {value:"5", text: "Май"}) );
+      sel.append( $("<option/>", {value:"6", text: "Июнь"}) );
+      sel.append( $("<option/>", {value:"7", text: "Июль"}) );
+      sel.append( $("<option/>", {value:"8", text: "Август"}) );
+      sel.append( $("<option/>", {value:"9", text: "Сентябрь"}) );
+      sel.append( $("<option/>", {value:"10", text: "Октябрь"}) );
+      sel.append( $("<option/>", {value:"11", text: "Ноябрь"}) );
+      sel.append( $("<option/>", {value:"12", text: "Декабрь"}) );
+      return sel
+  }
+
+  
+  function floatView(v) {
+      return (Math.round(v*100)/100).toFixed(2)
+  }
+  
+  function loadActList_ajax() {
+      var idd = safeInt(getUrlParameter("id", 0), 0);
+      if (idd == 0) {
+	  return null;
+      }
+      return $.ajax({
+          url: "/api/checks/"+idd.toString()+"/actlist",
+	  method: "GET",
+          timeout: 5000
+      });
+  }
+
+  function loadActList_data(data) {
+      $("#act_list").empty();
+      data.data.forEach(function(item, i, arr){
+	  var tr = $("<tr/>", {name:"row"})
+	  tr.append( $("<td/>", {class:"datacell", append: $("<input>", {type: "text", name: "pay_year", width: "95%", "value": item.pay_year, on:{ input: markChange } }) }) );
+	  var sel = genMonthSelect("pay_month");
+	  sel.val(item.pay_month);
+	  tr.append( $("<td/>", {class:"datacell", append: sel }) );
+	  ["overpay_sicklist", "underpay_sicklist", "overpay_birth", "underpay_birth", "overpay_1_early", "underpay_1_early", "ndfl_sicklist", "postal_expenses"].forEach(
+	      function(sitem){
+		  tr.append( $("<td/>", {class:"datacell", append: $("<input>", {type:"number", step: 0.01, name:sitem, width:"95%", "value": floatView(item[sitem]), on:{ input: markChange }}) }) );
+	      }
+	  );
+	  $('#act_list').append(tr);
+      });
+  }
+
+  function addLineActList() {
+      var tr = $("<tr/>", {name:"row"})
+      tr.append( $("<td/>", {class:"datacell", append: $("<input>", {type: "text", name: "pay_year", width: "95%", "value": "", on:{ input: markChange } }) }) );
+      var sel = genMonthSelect("pay_month");
+      sel.val(1);
+      tr.append( $("<td/>", {class:"datacell", append: sel }) );
+      ["overpay_sicklist", "underpay_sicklist", "overpay_birth", "underpay_birth", "overpay_1_early", "underpay_1_early", "ndfl_sicklist", "postal_expenses"].forEach(
+	  function(sitem){
+	      tr.append( $("<td/>", {class:"datacell", append: $("<input>", {type:"number", step: 0.01, name:sitem, width:"95%", "value": "0.00", on:{ input: markChange }}) }) );
+	  }
+      );
+      $('#act_list').append(tr);
+  }
+
+  function getActList() {
+      var saverows = [];
+      $('tr[name="row"]').each(function(){
+	  var e = $(this);
+	  row = {};
+	  row["pay_year"] = safeInt( e.find('input[name="pay_year"]').val(), 0);
+	  row["pay_month"] = safeInt( e.find('select[name="pay_month"]').val(), 0);
+	  ["overpay_sicklist", "underpay_sicklist", "overpay_birth", "underpay_birth", "overpay_1_early", "underpay_1_early", "ndfl_sicklist", "postal_expenses"].forEach(
+	      function(sitem){
+		  row[sitem] = safeFloat( e.find('input[name="'+sitem+'"]').val(), 0.0)
+	      }
+	  );
+          saverows.push(row);
+      });
+      return saverows;
+  }
+
+  function saveActList() {
+      var idd = safeInt(getUrlParameter("id", 0), 0);
+      if (idd == 0) {
+	  return;
+      }
+      rows = getActList();
+      return $.ajax({
+          url: "/api/checks/"+idd.toString()+"/actlist",
+	  data: JSON.stringify({id: idd, rows: rows}),
+	  method: "POST",
+          timeout: 5000
+      })
+      .done(function(data, textStatus, jqXHR) {
+          loadActList_data(data);
+      })
+      .fail(function(data, textStatus, jqXHR) {
+          console.log(data);
+          $('#test').text("fail");
+      });
+  }
+
+  document.addEventListener("DOMContentLoaded", function(){
+      var idd = safeInt(getUrlParameter("id", 0), 0);
+      if (idd == 0) {
+	  $.when(loadStaff_ajax()).done(function (data, status, jxhr){
+	      loadStaff_common(data);
+	      loadStaff_special(data);
+	      setInspectorFromCookie();
+	  });
+	  //оставляем инструменты добавления проверки
+	  $("#title_mode").text("Проверка (добавление)");
+	  $("#addCheck").show(); 
+	  $("#docs_req").hide();
+	  $("#docs_memorandum").hide();
+	  $("#docs_act").hide(); 
+	  $("#docs_decision").hide(); 
+	  $("#docs_charge").hide(); 
+	  //заполняем даты
+	  ["check_date_start","check_date_end","check_period_start","check_period_end"].forEach(
+	      function(item){
+		  $("#"+item).val(currentDate());
+	      }
+	  );
+      } else {
+	  $.when(loadStaff_ajax(), loadCheck_ajax(), loadActList_ajax()).done(function (a1,a2,a3){
+	      loadStaff_common(a1[0]);
+	      loadStaff_special(a1[0]);
+	      loadCheck_data(a2[0]);
+	      loadActList_data(a3[0]);
+	  });
+	  $("#title_mode").text("Проверка (редактирование)");
+	  $("#addCheck").hide(); //убираем инструменты добавления
+	  $("#docs_req").show(); 
+	  $("#docs_memorandum").show(); 
+	  $("#docs_act").show(); 
+	  $("#docs_decision").show(); 
+	  $("#docs_charge").show(); 
+      }
+  });
+
+</script>
+</head>
+<body>
+{{template "common_header"}}
+
+<div class="wrap">
+  <div class="container">
+    <input type="hidden" id="id" value="0"/>
+  <h2 align="center" id="title_mode">Проверка</h2>
+  <button onCLick="saveHeader(); return false;">Сохранить заголовок</button>
+  <br/>
+  <br/>
+
+<div id="addCheck">
+  <input id="regnum" type="text" length="20" value="" placeholder="Рег.номер"/><button onClick="fillInsurer(); return false;">Заполнить</button>
+  </div>
+<table>
+<tr><td>Рег.номер:</td> <td><span id="insurer_regnum"></span></td></tr>
+<tr><td>Наименование(полное):</td> <td><span id="insurer_fullname"></span></td></tr>
+<tr><td>Наименование(сокращенное):</td> <td><span id="insurer_shortname"></span></td></tr>
+<tr><td>КПС:</td> <td><span id="insurer_kpsnum"></span></td></tr>
+<tr><td>ИНН:</td> <td><span id="insurer_inn"></span></td></tr>
+<tr><td>КПП:</td> <td><span id="insurer_kpp"></span></td></tr>
+<tr><td>Индекс:</td> <td><span id="insurer_postindex"></span></td></tr>
+<tr><td>Адрес:</td> <td><span id="insurer_postaddress"></span></td></tr>
+</table>
+
+<table>
+<tr>
+<td>Проверка проведена</td> <td>с <input type="date" id="check_date_start" value="" onInput="markChange(this);"/> по <input type="date" id="check_date_end" value="" onInput="markChange(this);"/></td>
+</tr>
+<tr>
+<td>За период</td> <td>с <input type="date" id="check_period_start" value="" onInput="markChange(this);"/> по <input type="date" id="check_period_end" value="" onInput="markChange(this);"/></td>
+</tr>
+</table>
+
+<br/>
+Проверяющий: <select size="1" onChange="markChange(this);" value="0" id="inspector_id"></select><br/>
+
+<hr/>
+<div id="docs_req">
+  <h3>Требование</h3>
+<button onClick="saveDocsReq(); return false;">Сохранить требование (если номера нет, он будет присвоен)</button>
+<table>
+<tr>
+  <td>Требование № <span id="docs_req_number"></span> от <input type="date" id="docs_req_date" value="" onInput="markChange(this);"/></td>
+  <td><a href="/print/req" id="print_docs_req">Печатная форма</a></td>
+</tr>
+</table>
+<input type="checkbox" id="docs_req_flag_sicklist" onInput="markChange(this);"/><label>Пособие по временной нетрудоспособности</label><br/>
+<input type="checkbox" id="docs_req_flag_birth" onInput="markChange(this);"/><label>Пособие по беременности и родам</label><br/>
+<input type="checkbox" id="docs_req_flag_1_early" onInput="markChange(this);"/><label>Единовременное пособие женщинам, вставшим на учет в медицинских учреждениях в ранние сроки беременности</label><br/>
+<input type="checkbox" id="docs_req_flag_1_birth" onInput="markChange(this);"/><label>Единовременное пособие при рождении ребенка</label><br/>
+<input type="checkbox" id="docs_req_flag_15_child" onInput="markChange(this);"/><label>Ежемесячное пособие по уходу за ребенком</label><br/>
+<input type="checkbox" id="docs_req_flag_accident" onInput="markChange(this);"/><label>Пособие по временной нетрудоспособности в связи с несчастным случаем на производстве или профессиональным заболеванием</label><br/>
+<input type="checkbox" id="docs_req_flag_vacation" onInput="markChange(this);"/><label>Оплата отпуска (сверх ежегодного оплачиваемого отпуска) на весь период лечения и проезда к месту лечения и обратно</label><br/>
+<input type="checkbox" id="docs_req_flag_4days" onInput="markChange(this);"/><label>Возмещение расходов на оплату 4 дополнительных выходных дней одному из родителей (опекуну, попечителю) для ухода за детьми-инвалидами, включая начисленные страховые взносы в государственные внебюджетные фонды</label><br/>
+<input type="checkbox" id="docs_req_flag_burial_soc" onInput="markChange(this);"/><label>Возмещение расходов на выплату социального пособия на погребение</label><br/>
+<input type="checkbox" id="docs_req_flag_burial_spec" onInput="markChange(this);"/><label>Возмещение стоимости гарантированного перечня услуг по погребению специализированной службе по вопросам похоронного дела</label><br/>
+<hr/>
+
+<div id="docs_memorandum">
+  <h3>Докладная записка</h3>
+<button onClick="saveDocsMemorandum(); return false;">Сохранить докладную записку (если номера нет, он будет присвоен)</button>
+<table>
+<tr>
+  <td>Докладная записка № <span id="docs_memorandum_number"></span> от <input type="date" id="docs_memorandum_date" value="" onInput="markChange(this);"/></td>
+  <td><a href="/print/memorandum" id="print_docs_memorandum">Печатная форма</a></td>
+</tr>
+</table>
+</div>
+
+<hr/>
+<div id="docs_act">
+  <h3>Акт</h3>
+<button onClick="saveDocsAct(); return false;">Сохранить акт (если номера нет, он будет присвоен)</button>
+<table>
+<tr>
+  <td>Акт № <span id="docs_act_number"></span> от <input type="date" id="docs_act_date" value="" onInput="markChange(this);"/></td>
+  <td><a href="/print/act" id="print_docs_act">Печатная форма</a></td>
+</tr>
+</table>
+
+<br/>
+Расшифровка сумм<br/>
+<button onClick="addLineActList(); return false;">Добавить строку</button>
+<button onClick="saveActList(); return false;">Сохранить (строки с нулевыми суммами будут удалены)</button>
+<table class="datatable">
+  <thead>
+    <tr>
+      <td class="datacell" width="10%">Год</td>
+      <td class="datacell" width="10%">Месяц</td>
+      <td class="datacell" width="10%">Врем. нетрудоспособность (переплата)</td>
+      <td class="datacell" width="10%">Врем. нетрудоспособность (недоплата)</td>
+      <td class="datacell" width="10%">Берем. и роды (переплата)</td>
+      <td class="datacell" width="10%">Берем. и роды (недоплата)</td>
+      <td class="datacell" width="10%">Ранние сроки (переплата)</td>
+      <td class="datacell" width="10%">Ранние сроки (недоплата)</td>
+      <td class="datacell" width="10%">НДФЛ (БЛ)</td>
+      <td class="datacell" width="10%">Почтовые</td>
+    </tr>
+  </thead>
+  <tbody id="act_list"></tbody>
+<table>
+
+</div>
+
+<hr/>
+<div id="docs_decision">
+  <h3>Решение</h3>
+<button onClick="saveDocsDecision(); return false;">Сохранить решение (если номера нет, он будет присвоен)</button>
+<table>
+<tr>
+  <td>Решение № <span id="docs_decision_number"></span> от <input type="date" id="docs_decision_date" value="" onInput="markChange(this);"/></td>
+  <td><a href="/print/decision" id="print_docs_decision">Печатная форма</a></td>
+</tr>
+</table>
+</div>
+
+<hr/>
+<div id="docs_charge">
+  <h3>Требование об уплате</h3>
+<button onClick="saveDocsCharge(); return false;">Сохранить требование (если номера нет, он будет присвоен)</button>
+<table>
+<tr>
+  <td>Решение № <span id="docs_charge_number"></span> от <input type="date" id="docs_charge_date" value="" onInput="markChange(this);"/></td>
+  <td><a href="/print/charge" id="print_docs_charge">Печатная форма</a></td>
+</tr>
+</table>
+</div>
+
+
+</div>
+</div>
+</div>
+
+</body>
+</html>
